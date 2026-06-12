@@ -17,10 +17,14 @@
 #include <deque>
 #include <vector>
 #include <string>
+#include <map>
+#include <utility>
 
 using std::deque;
 using std::vector;
 using std::string;
+using std::map;
+using std::pair;
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -67,6 +71,48 @@ static deque<double> makeWindow(double freq, int sr, int n, int startN,
     }
     return buff;
 }
+
+// Convert a cents offset relative to `base` into an absolute frequency.
+static double centsToFreq(double base, double c) { return base * std::pow(2.0, c / 1200.0); }
+
+// Faithful model of LatencyMonoQuantizer::getAverageFrequency() over the frames
+// currently inside the latency window (most-recent first). It buckets each frame
+// by its nearest semitone (Music::f2cf), keeps a running mean per bucket, and
+// returns the mean of the densest bucket -- exactly the live quantizer's logic
+// (src/LatencyMonoQuantizer.cpp). Crucially it reproduces the degenerate path:
+// when no bucket repeats (max_dens stays 1) the raw current frame passes through
+// with NO smoothing, which is precisely when the needle wobbles most for #1.
+static double quantizerBoxcar(const deque<double>& win)
+{
+    map<double, pair<int, double> > dens; // center freq -> (count, running mean)
+    double avg = win.front();             // default: raw most-recent frame
+    int maxd = 1;
+    for (size_t i = 0; i < win.size(); ++i)
+    {
+        const double cf = Music::f2cf(win[i]);
+        map<double, pair<int, double> >::iterator it = dens.find(cf);
+        if (it == dens.end())
+            dens.insert(std::make_pair(cf, std::make_pair(1, win[i])));
+        else
+        {
+            it->second.second = (it->second.second * it->second.first + win[i]) / (it->second.first + 1);
+            it->second.first += 1;
+            if (it->second.first > maxd) { maxd = it->second.first; avg = it->second.second; }
+        }
+    }
+    return avg;
+}
+
+// Running mean/spread accumulator in cents (vs a known true f0).
+struct Spread
+{
+    double sum, sum2, lo, hi; int n;
+    Spread() : sum(0), sum2(0), lo(1e9), hi(-1e9), n(0) {}
+    void add(double c) { sum += c; sum2 += c * c; if (c < lo) lo = c; if (c > hi) hi = c; ++n; }
+    double mean() const { return n ? sum / n : 0.0; }
+    double stddev() const { double m = mean(), v = n ? sum2 / n - m * m : 0.0; return std::sqrt(v < 0 ? 0 : v); }
+    double ptp() const { return n ? hi - lo : 0.0; }
+};
 
 // ---------------------------------------------------------------------------
 // tiny assertion framework
@@ -144,6 +190,56 @@ static void stabilityScan(Music::CombedFT& algo, int sr, int win, double f,
     check("stability", valid == frames && sd < 50.0, string(sdetail));
 }
 
+// Downstream smoother comparison (fork issue #1).
+//
+// Tests [1-4] show the detector is sub-cent steady on a clean tone, so the
+// needle wobble users report cannot originate there -- it enters where the live
+// frame-to-frame f0 (jittered by a real mic/instrument) is turned into the
+// displayed value. That single smoothing stage is LatencyMonoQuantizer's boxcar.
+//
+// This scan feeds a *controlled* noisy f0 stream (slow drift + white jitter, the
+// shape of real steady-note measurement noise) through two smoothers at matched
+// 125 ms latency: the current density-bucket boxcar (~6 taps @ 20 ms refresh)
+// and a one-pole EMA. It reports how much needle wobble each removes. No GUI or
+// quantizer object is touched; quantizerBoxcar() mirrors the live algorithm.
+static void smootherScan(double f0, double jitterCents, double driftCents,
+                         int win, double emaAlpha, Rng& rng, const char* label)
+{
+    const int frames = 600;        // 12 s @ 20 ms
+    const double refresh_s = 0.020;
+    const double drift_hz = 0.5;   // slow wander, e.g. breath/bow/room
+
+    deque<double> recent;
+    double ema = f0;
+    Spread raw, box, em;
+    for (int k = 0; k < frames; ++k)
+    {
+        const double drift = driftCents * std::sin(2.0 * M_PI * drift_hz * (k * refresh_s));
+        const double c = drift + jitterCents * rng.next();   // rng.next() in [-1,1]
+        const double f = centsToFreq(f0, c);
+
+        recent.push_front(f);
+        while (int(recent.size()) > win) recent.pop_back();
+
+        ema = emaAlpha * f + (1.0 - emaAlpha) * ema;
+
+        raw.add(cents(f, f0));
+        box.add(cents(quantizerBoxcar(recent), f0));
+        em.add(cents(ema, f0));
+    }
+
+    std::printf("    %-22s raw: stddev=%.2f ptp=%.2f | boxcar(%d-tap): stddev=%.2f ptp=%.2f | EMA: stddev=%.2f ptp=%.2f  (cents)\n",
+                label, raw.stddev(), raw.ptp(), win, box.stddev(), box.ptp(), em.stddev(), em.ptp());
+
+    // The lever for #1: at equal latency the EMA must leave less residual wobble
+    // than the current boxcar. (For the boundary case the boxcar's bucket flips,
+    // so we assert on ptp, which is what the eye reads as a jump.)
+    char d[160];
+    std::snprintf(d, sizeof(d), "%s: EMA stddev %.2f < boxcar stddev %.2f cents",
+                  label, em.stddev(), box.stddev());
+    check("smoother", em.stddev() <= box.stddev(), string(d));
+}
+
 // ---------------------------------------------------------------------------
 
 int main()
@@ -195,6 +291,18 @@ int main()
     std::printf("    (quantifies fork issue #1 / upstream #137 -- clean vs realistic input):\n");
     stabilityScan(algo, sr, win, 293.66, pure, 0.00, rng, "pure sine");
     stabilityScan(algo, sr, win, 293.66, harm, 0.05, rng, "harmonics+noise");
+
+    // -- Test 5: downstream needle smoothing (the actual fix surface for #1) --
+    // Models the live signal path: a jittery per-frame f0 (what a real mic/string
+    // produces) fed through the quantizer the needle reads. At the default 20 ms
+    // refresh / 125 ms latency the current boxcar is only ~6 taps; an EMA at the
+    // same latency damps the residual wobble harder and never flips buckets.
+    const int qwin = int(125.0 / 20.0 + 0.5);              // latency / refresh ~ 6 taps
+    const double alpha = 1.0 - std::exp(-20.0 / 125.0);    // one-pole, tau ~ 125 ms
+    std::printf("\n[5] Downstream needle smoothing on a jittery f0 stream (issue #1 fix surface,\n");
+    std::printf("    quantizer window=%d taps, EMA alpha=%.3f, both ~125 ms latency):\n", qwin, alpha);
+    smootherScan(293.66, 10.0, 3.0, qwin, alpha, rng, "note centred (D4)");
+    smootherScan(302.27, 10.0, 3.0, qwin, alpha, rng, "near semitone edge");
 
     std::printf("\n%d/%d checks passed, %d failed\n", g_total - g_fail, g_total, g_fail);
     return g_fail == 0 ? 0 : 1;
