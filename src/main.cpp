@@ -26,6 +26,9 @@ using namespace std;
 // #include <qtextcodec.h>
 #include <qtranslator.h>
 #include <QLibraryInfo>
+#include <QPainter>
+#include <QPixmap>
+#include <QFont>
 
 #include "CppAddons/CAMath.h"
 
@@ -53,7 +56,7 @@ QString FMITVersion(){
 
 int main(int argc, char** argv)
 {
-    std::cout << "Free Music Instrument Tuner (Version " << FMITVersion().toLatin1().constData() << ")" << std::endl;
+    std::cout << "Free Music Instrument Tuner - Errorbuild (Version " << FMITVersion().toLatin1().constData() << ")" << std::endl;
 
     QString fmitprefix(STR(PREFIX));
 
@@ -63,7 +66,24 @@ int main(int argc, char** argv)
     QCoreApplication::setOrganizationDomain("gillesdegottex.eu");
     QCoreApplication::setApplicationName("FMIT");
     QCoreApplication::setApplicationVersion(FMITVersion());
-    a.setWindowIcon(QIcon(":/fmit/ui/images/fmit.svg"));
+    // Errorbuild: badge the window/taskbar icon with a coloured "DEV" marker so
+    // this build is unmistakable next to a stock FMIT running alongside it.
+    QPixmap devIcon = QIcon(":/fmit/ui/images/fmit.svg").pixmap(64, 64);
+    {
+        QPainter painter(&devIcon);
+        painter.setRenderHint(QPainter::Antialiasing, true);
+        const QRect badge(2, 40, 60, 22);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(QColor(0xE8, 0x4A, 0x1A));   // distinctive orange-red
+        painter.drawRoundedRect(badge, 5, 5);
+        QFont devFont = painter.font();
+        devFont.setBold(true);
+        devFont.setPixelSize(15);
+        painter.setFont(devFont);
+        painter.setPen(Qt::white);
+        painter.drawText(badge, Qt::AlignCenter, "DEV");
+    }
+    a.setWindowIcon(QIcon(devIcon));
 
     // Load translation
     QTranslator qtTranslator;

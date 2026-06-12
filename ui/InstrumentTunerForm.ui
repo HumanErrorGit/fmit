@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Free Music Instrument Tuner</string>
+   <string>Free Music Instrument Tuner - Errorbuild</string>
   </property>
   <property name="windowIcon">
    <iconset resource="../fmit.qrc">
