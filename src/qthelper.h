@@ -166,6 +166,7 @@ inline QString formatToString(const QAudioFormat &format) {
         const QString formatEndian = QString("Assume LE");
 
         QString formatType;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
         switch (format.sampleFormat()) {
         case QAudioFormat::UInt8:
             formatType = "unsigned";
@@ -186,6 +187,22 @@ inline QString formatToString(const QAudioFormat &format) {
             formatType = "unknown";
             break;
         }
+#else
+        switch (format.sampleType()) {
+        case QAudioFormat::UnSignedInt:
+            formatType = "unsigned";
+            break;
+        case QAudioFormat::SignedInt:
+            formatType = "signed";
+            break;
+        case QAudioFormat::Float:
+            formatType = "float";
+            break;
+        default:
+            formatType = "unknown";
+            break;
+        }
+#endif
 
         QString formatChannels = QString("%1 channels").arg(format.channelCount());
         switch (format.channelCount()) {
@@ -202,7 +219,11 @@ inline QString formatToString(const QAudioFormat &format) {
 
         result = codec+" "+QString("%1Hz %2bit %3 %4 %5")
             .arg(format.sampleRate())
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
             .arg(format.bytesPerSample()*8)
+#else
+            .arg(format.sampleSize())
+#endif
             .arg(formatType)
             .arg(formatEndian)
             .arg(formatChannels);

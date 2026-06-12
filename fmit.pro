@@ -133,11 +133,13 @@ win32 {
     msvc: LIBS += opengl32.lib
     msvc: LIBS += glu32.lib
     gcc: LIBS += -lopengl32
-    gcc: LIBS += -glu32
+    gcc: LIBS += -lglu32
 }
 
-QT += core gui opengl openglwidgets multimedia svg
+QT += core gui opengl multimedia svg
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
+# QOpenGLWidget lives in QtWidgets on Qt5, but moved to its own module on Qt6
+greaterThan(QT_MAJOR_VERSION, 5): QT += openglwidgets
 macx: QT += network
 
 INCLUDEPATH += libs
@@ -261,7 +263,9 @@ linux {
     appdata_tr.commands = $$sprintf($$QMAKE_MKDIR_CMD, $$OUT_PWD/distrib/) && itstool -j $$PWD/distrib/fmit.appdata.xml.in -o $@ $$APPDATA_MO
     QMAKE_EXTRA_TARGETS += appdata_tr
     PRE_TARGETDEPS += $$appdata_tr.target
-} else {
+} else:unix {
+    # AppStream metadata is Linux/Unix-only; skip on win32 (the cp fallback
+    # breaks under MinGW make where backslash paths meet the unix shell)
     appdata_no_tr.depends = $$PWD/distrib/fmit.appdata.xml.in
     appdata_no_tr.target = $$OUT_PWD/distrib/fmit.appdata.xml
     appdata_no_tr.commands = $$sprintf($$QMAKE_MKDIR_CMD, $$system_path($$OUT_PWD/distrib/)) && $$QMAKE_COPY $$system_path($$appdata_no_tr.depends) $$system_path($$appdata_no_tr.target)

@@ -68,10 +68,15 @@ int main(int argc, char** argv)
     // Load translation
     QTranslator qtTranslator;
     std::cout << "INFO: QLocale::system()=" << QLocale::system().name() << std::endl;
-    std::cout << "INFO: QLibraryInfo::path(QLibraryInfo::TranslationsPath)=" << QLibraryInfo::path(QLibraryInfo::TranslationsPath).toLatin1().constData() << std::endl;
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    const QString qtTrPath = QLibraryInfo::path(QLibraryInfo::TranslationsPath);
+#else
+    const QString qtTrPath = QLibraryInfo::location(QLibraryInfo::TranslationsPath);
+#endif
+    std::cout << "INFO: Qt translations path=" << qtTrPath.toLatin1().constData() << std::endl;
     QString trFile = "qt_" + QLocale::system().name();
-    if (!qtTranslator.load(trFile, QLibraryInfo::path(QLibraryInfo::TranslationsPath))) {
-        cout << "ERROR: Failed to load Qt translation file: " << trFile.toLatin1().constData() << " in " << QLibraryInfo::path(QLibraryInfo::TranslationsPath).toLatin1().constData() << endl;
+    if (!qtTranslator.load(trFile, qtTrPath)) {
+        cout << "ERROR: Failed to load Qt translation file: " << trFile.toLatin1().constData() << " in " << qtTrPath.toLatin1().constData() << endl;
     }
     a.installTranslator(&qtTranslator);
     QTranslator fmitTranslator;

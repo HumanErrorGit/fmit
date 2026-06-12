@@ -29,7 +29,11 @@
 /.project
 
 /build
+/build-qt5
 
 /distrib/FMIT-*
 *.pro.user
 tr/*.qm
+
+# Local toolchain / aqtinstall logs
+aqtinstall.log
