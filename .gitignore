@@ -30,6 +30,7 @@
 
 /build
 /build-qt5
+/build-tests
 
 /distrib/FMIT-*
 *.pro.user
