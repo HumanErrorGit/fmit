@@ -48,7 +48,9 @@ Full instructions in `INSTALL.txt`.
 
 ## Testing and Linting
 
-There is no automated test suite and no linter configured. CI (Travis CI / AppVeyor) validates the build compiles cleanly. To check for issues, watch compiler warnings during `make`.
+A standalone DSP test harness lives in `tests/` (`tests/dsp_test.pro` + `tests/dsp_test.cpp`). It feeds synthetic signals into the `CombedFT` pitch detector and asserts the detected f0 — accuracy (pure tone, harmonics, noise) and frame-to-frame stability — independent of the GUI and audio hardware. It builds and runs separately from the app; see `tests/README.md`. The harness returns a non-zero exit code on failure, so it is CI-friendly.
+
+There is no linter configured. CI (Travis CI / AppVeyor) validates that the main build compiles cleanly, so also watch compiler warnings during `make`.
 
 ## Architecture
 

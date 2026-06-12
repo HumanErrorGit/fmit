@@ -51,3 +51,15 @@ configuration file appveyor.yml. It is complete and self-explanatory.
 The distribution packages are built using the Inno Setup program.
 They can be built using the script files package_*.sh that runs in the
 GitHub console for Windows.
+
+
+Tests --------------------------------------------------------------------------
+
+A standalone DSP test harness lives in the tests/ directory. It has no GUI or
+audio-hardware dependency and is built separately from the application:
+
+    $ cd tests
+    $ qmake dsp_test.pro && make
+    $ ./dsp_test
+
+See tests/README.md for details and the Windows build command.

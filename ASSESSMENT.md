@@ -2,6 +2,12 @@
 
 _Exploratory review, 2026-06-10. No code changed. Findings + prioritized backlog._
 
+> **Status (2026-06-12):** kept as the original snapshot above; work has since
+> started on branch `fix/qt5-windows-build`. Done: the DSP test harness (backlog
+> #1) now lives in `tests/`, and the Qt5/Windows build has been restored (the
+> source had drifted to Qt6-only APIs in a few spots, with version guards added).
+> Still open: finishing the Qt6 audio backend (backlog #3).
+
 ## Summary
 
 FMIT is a mature, cleanly-architected C++/Qt real-time instrument tuner, ~14.5K LOC,
