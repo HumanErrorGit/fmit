@@ -34,6 +34,7 @@
 #include <QAudioFormat>
 #include <QDir>
 #include <QDebug>
+#include <QMouseEvent>
 
 #ifdef __MINGW32__
     #define COMPILER "MinGW"
@@ -153,6 +154,23 @@ inline std::ostream& operator<<(std::ostream& stream, const QTime& t) {
     stream << t.toString("hh:mm:ss.zzz").toLocal8Bit().constData();
 
     return stream;
+}
+
+// Portable mouse-event coordinates: QMouseEvent::position()/globalPosition()
+// return QPointF on Qt6; pos()/globalPos() are the Qt5 spelling (QPoint).
+inline QPoint eventPos(QMouseEvent* e) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    return e->position().toPoint();
+#else
+    return e->pos();
+#endif
+}
+inline QPoint eventGlobalPos(QMouseEvent* e) {
+#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
+    return e->globalPosition().toPoint();
+#else
+    return e->globalPos();
+#endif
 }
 
 inline QString formatToString(const QAudioFormat &format) {

@@ -18,6 +18,7 @@
 
 
 #include "View.h"
+#include "../qthelper.h"
 
 #include <cassert>
 #include <iostream>
@@ -93,11 +94,7 @@ View::View(const QString& name, QWidget* parent)
 void View::mouseReleaseEvent(QMouseEvent* e)
 {
 	if(e->button()==Qt::RightButton)
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-		m_popup_menu.exec(e->globalPosition().toPoint());
-#else
-		m_popup_menu.exec(e->globalPos());
-#endif
+		m_popup_menu.exec(eventGlobalPos(e));
 }
 
 // ----------------------- LabeledSpinBox ------------------------

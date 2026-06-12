@@ -19,6 +19,7 @@
 // TODO zoom with a rectangle
 
 #include "GLFT.h"
+#include "../qthelper.h"
 
 #include <iostream>
 using namespace std;
@@ -168,11 +169,7 @@ void GLFT::initializeGL()
 void GLFT::mousePressEvent(QMouseEvent* e)
 {
 	m_start_move_mouse = true;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-	const QPoint p = e->position().toPoint();
-#else
-	const QPoint p = e->pos();
-#endif
+	const QPoint p = eventPos(e);
 	m_press_x = p.x();
 	m_press_y = p.y();
 	m_press_minf = m_minf;
@@ -196,11 +193,7 @@ void GLFT::mouseMoveEvent(QMouseEvent* e)
 {
 	static int old_x;
 	static int old_y;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-	const QPoint p = e->position().toPoint();
-#else
-	const QPoint p = e->pos();
-#endif
+	const QPoint p = eventPos(e);
 	if(m_start_move_mouse)
 	{
 		old_x = p.x();
