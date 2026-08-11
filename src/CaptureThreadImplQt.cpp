@@ -343,32 +343,37 @@ void CaptureThreadImplQt::audioDataReady()
 
         const qint64 bytesAvailable = m_audioSource->bytesAvailable();
 
-        qint64 nbframes = bytesAvailable/(m_format.bytesPerSample());
+        if(bytesAvailable>0) {
+            if(m_readBuffer.size() < bytesAvailable)
+                m_readBuffer.resize(bytesAvailable);
 
-        if(m_capture_thread->m_pause) {
-            // Discard data when paused
-            for(qint64 i=0; i<nbframes; i++) {
-                long int value = 0;
-                m_audioInputIODevice->read((char*)&value, m_format.bytesPerSample());
+            // Bulk-read the whole available block in one call, instead of
+            // re-entering QIODevice::read() one sample at a time (that used
+            // to restart the Windows backend's zero-interval pull timer on
+            // every single sample and livelock the main thread).
+            const qint64 bytesRead = m_audioInputIODevice->read(m_readBuffer.data(), bytesAvailable);
+
+            if(bytesRead>0) {
+                const qint64 nbframes = bytesRead/(m_format.bytesPerSample());
+
+                if(m_capture_thread->m_pause) {
+                    // Discard data when paused: the read above already
+                    // consumed it, nothing more to do.
+                }
+                else {
+
+                    for(qint64 i=0; i<nbframes; i++)
+                        addValue(this, decodeValue((void*)m_readBuffer.data(), i), i);
+
+                    m_capture_thread->m_packet_size = nbframes;
+                    if(m_capture_thread->m_ext_lock)
+                    {
+                        m_capture_thread->m_packet_size_sll = 0;
+                        m_capture_thread->m_ext_lock = false;
+                    }
+                    m_capture_thread->m_packet_size_sll += nbframes;
+                }
             }
-        }
-        else {
-
-            for(qint64 i=0; i<nbframes; i++) {
-                long int value = 0;
-                qint64 bytesRead = m_audioInputIODevice->read((char*)&value, m_format.bytesPerSample());
-
-                if(bytesRead>0)
-                    addValue(this, decodeValue((void*)&value, 0), i);
-            }
-
-            m_capture_thread->m_packet_size = nbframes;
-            if(m_capture_thread->m_ext_lock)
-            {
-                m_capture_thread->m_packet_size_sll = 0;
-                m_capture_thread->m_ext_lock = false;
-            }
-            m_capture_thread->m_packet_size_sll += nbframes;
         }
 
         m_capture_thread->m_lock.unlock();

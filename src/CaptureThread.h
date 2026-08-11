@@ -106,6 +106,8 @@ class CaptureThreadImplQt : public QObject, public CaptureThreadImpl
 
     QAudioFormat        m_format;
 
+    QByteArray          m_readBuffer;
+
   public:
     CaptureThreadImplQt(CaptureThread* capture_thread);
 
