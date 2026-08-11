@@ -12,27 +12,43 @@ Current version: 1.3.3. Source: https://github.com/gillesdegottex/fmit
 
 Uses **qmake** (Qt build system). No CMake, no npm, no Makefile written manually.
 
+**The project is Qt6-only as of the upstream v1.4.6 merge.** Do not reintroduce Qt5 guards, `qmake-qt5`/`qtX-qt5` invocations, or Qt5 package names.
+
 ### Linux/macOS
 
+Never built locally in this fork; the recipe below is what upstream CI (`.github/workflows/build.yml`, `ubuntu-24.04` and `macos-latest` jobs) runs — treat it as attributed CI behavior, not a verified local command.
+
 ```bash
-mkdir build && cd build
-qmake-qt5 "CONFIG+=acs_qt acs_alsa acs_jack acs_portaudio" ../fmit.pro
-make
+# Linux (ubuntu-24.04, per .github/workflows/build.yml)
+qmake6 "CONFIG+=acs_alsa" fmit.pro
+make -j$(nproc)
 make lrelease   # compile translation .ts → .qm files
+
+# macOS (macos-latest, Homebrew qt, per .github/workflows/build.yml)
+qmake "FFT_LIBDIR=$FFT_PATH" fmit.pro   # FFT_PATH = brew --prefix fftw
+make -j$(sysctl -n hw.ncpu)
+make lrelease
 ```
 
 ### Windows
 
-```powershell
-qmake "FFT_LIBDIR=C:\path\to\fftw3" fmit.pro
-jom.exe -f Makefile.Release
+Verified locally: MSVC 2022 Build Tools + Qt 6.8.3 (`msvc2022_64`) + FFTW3 via vcpkg, built out-of-source with `nmake` (not `jom` — see note below).
+
+```bat
+call "F:\VS\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+set PATH=F:\Qt\6.8.3\msvc2022_64\bin;%PATH%
+cd /d F:\FMIT-Error\fmit\build-qt6
+qmake "FFT_LIBDIR=F:/vcpkg/installed/x64-windows" ..\fmit.pro
+nmake -f Makefile.Release
 ```
+
+`jom` does **not** work in this environment: on the Makefiles that Qt 6.8.3's qmake generates here, `jom.exe -f Makefile.Release` fails with a false "dependent does not exist" error. Every successful Windows build in this fork used `nmake -f Makefile.Release` instead. (Upstream CI's Windows job still uses `jom` successfully in its own environment — see `.github/workflows/build.yml` — so this is an environment-specific quirk, not a universal rule.)
 
 ### Audio capture backends (CONFIG flags)
 
 | Flag | Backend | Platform |
 |------|---------|----------|
-| `acs_qt` | Qt Multimedia | All (default for Windows) |
+| `acs_qt` | Qt Multimedia | All platforms (unconditionally enabled by default in `fmit.pro`) |
 | `acs_alsa` | ALSA | Linux only |
 | `acs_jack` | JACK | Linux only |
 | `acs_portaudio` | PortAudio | Cross-platform |
@@ -40,9 +56,11 @@ jom.exe -f Makefile.Release
 
 ### Dependencies
 
-- Qt 5.x: `qtbase5-dev`, `qtmultimedia5-dev`, `libqt5opengl5-dev`, `libqt5svg5-dev`, `qttools5-dev-tools`
-- FFTW3: `libfftw3-dev`
-- Optional (Linux): `libasound2-dev`, `libjack-dev`, `portaudio19-dev`
+- Qt 6.x (Linux, per CI): `qt6-base-dev`, `qt6-declarative-dev`, `qt6-tools-dev`, `qt6-multimedia-dev`, `qt6-svg-dev`
+- Qt 6.x (Windows, verified locally): Qt 6.8.3 `msvc2022_64` kit (installs qmake + lrelease under `\bin`)
+- Qt 6.x (macOS, per CI): Homebrew `qt`
+- FFTW3: `libfftw3-dev` (Linux, per CI); vcpkg `fftw3:x64-windows` (Windows, verified locally); Homebrew `fftw` (macOS, per CI)
+- Optional (Linux, per CI): `libasound2-dev`, `libpulse-dev`
 
 Full instructions in `INSTALL.txt`.
 
@@ -50,7 +68,9 @@ Full instructions in `INSTALL.txt`.
 
 A standalone DSP test harness lives in `tests/` (`tests/dsp_test.pro` + `tests/dsp_test.cpp`). It feeds synthetic signals into the `CombedFT` pitch detector and asserts the detected f0 — accuracy (pure tone, harmonics, noise) and frame-to-frame stability — independent of the GUI and audio hardware. It builds and runs separately from the app; see `tests/README.md`. The harness returns a non-zero exit code on failure, so it is CI-friendly.
 
-There is no linter configured. CI (Travis CI / AppVeyor) validates that the main build compiles cleanly, so also watch compiler warnings during `make`.
+Verified locally on Windows (MSVC/Qt6, out-of-source in `build-tests`, `nmake -f Makefile.Release`, `fftw3.dll` copied next to the exe): 15/15 checks passed, exit code 0.
+
+There is no linter configured. CI is GitHub Actions (`.github/workflows/build.yml`), building on a three-platform matrix (`ubuntu-24.04`, `macos-latest`, `windows-2025`) and validating that the main build compiles cleanly, so also watch compiler warnings during the build.
 
 ## Architecture
 
