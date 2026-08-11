@@ -231,6 +231,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Fork-only: only fmit-windows is produced by the trimmed matrix above.
+          # nullglob makes the unmatched linux/macos patterns disappear instead
+          # of being passed to `gh` as literal (nonexistent) filenames, which
+          # would otherwise fail the step under bash's default -e. This also
+          # means the release picks the platforms back up automatically if
+          # linux/macos are ever restored to the build matrix.
+          shopt -s nullglob
           VERSION=${GITHUB_REF#refs/tags/v}
           gh release create "$GITHUB_REF_NAME" \
             --title "Version $VERSION" \
