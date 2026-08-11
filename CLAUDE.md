@@ -16,15 +16,15 @@ Uses **qmake** (Qt build system). No CMake, no npm, no Makefile written manually
 
 ### Linux/macOS
 
-Never built locally in this fork; the recipe below is what upstream CI (`.github/workflows/build.yml`, `ubuntu-24.04` and `macos-latest` jobs) runs — treat it as attributed CI behavior, not a verified local command.
+Never built locally in this fork, and not built by this fork's CI either: `.github/workflows/build.yml` was deliberately trimmed to a Windows-only matrix, because this fork is developed and verified on Windows and its Linux/macOS builds have never been exercised. The Linux/macOS steps below are **upstream's** recipe, preserved for reference — they still exist as dead `if: matrix.platform == 'linux'` / `'macos'` steps in the workflow file, but those conditions never match on the trimmed `windows-2025`-only matrix, so they never run.
 
 ```bash
-# Linux (ubuntu-24.04, per .github/workflows/build.yml)
+# Linux (upstream recipe, dead steps in .github/workflows/build.yml — never run in this fork)
 qmake6 "CONFIG+=acs_alsa" fmit.pro
 make -j$(nproc)
 make lrelease   # compile translation .ts → .qm files
 
-# macOS (macos-latest, Homebrew qt, per .github/workflows/build.yml)
+# macOS (upstream recipe, dead steps in .github/workflows/build.yml — never run in this fork)
 qmake "FFT_LIBDIR=$FFT_PATH" fmit.pro   # FFT_PATH = brew --prefix fftw
 make -j$(sysctl -n hw.ncpu)
 make lrelease
@@ -42,7 +42,16 @@ qmake "FFT_LIBDIR=F:/vcpkg/installed/x64-windows" ..\fmit.pro
 nmake -f Makefile.Release
 ```
 
-`jom` does **not** work in this environment: on the Makefiles that Qt 6.8.3's qmake generates here, `jom.exe -f Makefile.Release` fails with a false "dependent does not exist" error. Every successful Windows build in this fork used `nmake -f Makefile.Release` instead. (Upstream CI's Windows job still uses `jom` successfully in its own environment — see `.github/workflows/build.yml` — so this is an environment-specific quirk, not a universal rule.)
+`jom` fails specifically on **out-of-source (shadow) builds**: running `qmake ..\fmit.pro` from a separate `build-qt6` directory makes qmake emit an extra `..` level in moc dependency paths, which `jom.exe -f Makefile.Release` rejects with a false "dependent does not exist" error even though `nmake` tolerates the same Makefile. Every successful Windows build in this fork used `nmake -f Makefile.Release` from `build-qt6` instead. This is not a machine-wide problem: CI's Windows job runs `jom -f Makefile.Release` in-source at the repo root (`qmake fmit.pro` with no build subdirectory — see `.github/workflows/build.yml`) on the same Qt 6.8.3, and is green.
+
+After the build, compile translations — **run this from the repo root, not from the build directory**:
+
+```bat
+cd /d F:\FMIT-Error\fmit
+F:\Qt\6.8.3\msvc2022_64\bin\lrelease.exe F:/FMIT-Error/fmit/fmit.pro
+```
+
+Trap: `nmake lrelease` (or `jom lrelease`) run from the out-of-source build directory (e.g. `build-qt6`) exits 0 but silently produces **nothing** — `lrelease` resolves the `TRANSLATIONS` `.ts` paths in `fmit.pro` relative to the current working directory, not to the `.pro` file's location, so it quietly looks for `tr/*.ts` under `build-qt6\tr\` and finds no files. Running `lrelease.exe` directly against `fmit.pro` with the working directory set to the repo root generates all 11 `tr/fmit_*.qm` files. Qt loads translations from `applicationDirPath()` at runtime, so for a deployed/run build the resulting `.qm` files must also be copied next to `fmit.exe`.
 
 ### Audio capture backends (CONFIG flags)
 
@@ -70,7 +79,7 @@ A standalone DSP test harness lives in `tests/` (`tests/dsp_test.pro` + `tests/d
 
 Verified locally on Windows (MSVC/Qt6, out-of-source in `build-tests`, `nmake -f Makefile.Release`, `fftw3.dll` copied next to the exe): 15/15 checks passed, exit code 0.
 
-There is no linter configured. CI is GitHub Actions (`.github/workflows/build.yml`), building on a three-platform matrix (`ubuntu-24.04`, `macos-latest`, `windows-2025`) and validating that the main build compiles cleanly, so also watch compiler warnings during the build.
+There is no linter configured. CI is GitHub Actions (`.github/workflows/build.yml`), building **Windows only** (`windows-2025`) — deliberately trimmed from upstream's three-platform matrix, since this fork is developed and verified on Windows and its Linux/macOS builds have never been exercised — and validating that the main build compiles cleanly, so also watch compiler warnings during the build.
 
 ## Architecture
 

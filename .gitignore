@@ -36,9 +36,7 @@
 *.pro.user
 tr/*.qm
 build/
-/build-qt5
 /build-qt6
-/build-tests
 
 # Local toolchain / aqtinstall logs
 aqtinstall.log

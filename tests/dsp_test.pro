@@ -4,8 +4,11 @@
 # Usage (Windows / MSVC):
 #   qmake "FFT_LIBDIR=F:/vcpkg/installed/x64-windows" dsp_test.pro
 #   nmake -f Makefile.Release
-#   (jom does NOT work here -- fails with a false "dependent does not exist"
-#    error on Qt 6.8.3 qmake-generated Makefiles; nmake is what was verified)
+#   (jom fails on this out-of-source layout -- qmake's extra ".." level in moc
+#    dependency paths trips a false "dependent does not exist" error in jom,
+#    which nmake tolerates; nmake is what was verified. CI runs jom in-source
+#    at the repo root successfully, so this is shadow-build-specific, not a
+#    universal jom problem.)
 # Usage (Linux):
 #   qmake6 dsp_test.pro && make
 
