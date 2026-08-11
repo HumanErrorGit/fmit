@@ -17,10 +17,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-24.04
-            platform: linux
-          - os: macos-latest
-            platform: macos
+          # Fork-only: upstream also builds ubuntu-24.04 and macos-latest here.
+          # Removed deliberately; this fork is only verified on Windows for now.
           - os: windows-2025
             platform: windows
             arch: x64
