@@ -19,7 +19,6 @@
 // TODO zoom with a rectangle
 
 #include "GLFT.h"
-#include "../qthelper.h"
 
 #include <iostream>
 using namespace std;
@@ -169,9 +168,8 @@ void GLFT::initializeGL()
 void GLFT::mousePressEvent(QMouseEvent* e)
 {
 	m_start_move_mouse = true;
-	const QPoint p = eventPos(e);
-	m_press_x = p.x();
-	m_press_y = p.y();
+	m_press_x = e->position().x();
+	m_press_y = e->position().y();
 	m_press_minf = m_minf;
 	m_press_maxf = m_maxf;
 
@@ -193,22 +191,21 @@ void GLFT::mouseMoveEvent(QMouseEvent* e)
 {
 	static int old_x;
 	static int old_y;
-	const QPoint p = eventPos(e);
 	if(m_start_move_mouse)
 	{
-		old_x = p.x();
-		old_y = p.y();
+		old_x = e->position().x();
+		old_y = e->position().y();
 		m_start_move_mouse = false;
 	}
-	int dx = p.x() - old_x;
-	int dy = p.y() - old_y;
+	int dx = e->position().x() - old_x;
+	int dy = e->position().y() - old_y;
 
 	if(Qt::LeftButton & e->buttons())
 	{
 		if(Qt::ShiftModifier & e->modifiers())
 		{
 			double f = (m_maxf-m_minf)*double(m_press_x)/width()+m_minf;
-			double zx = double(m_press_x-p.x())/width();
+			double zx = double(m_press_x-e->position().x())/width();
 			zx = pow(8, zx);
 			m_minf = f - zx*(f-m_press_minf);
 			m_maxf = f + zx*(m_press_maxf-f);
@@ -230,8 +227,8 @@ void GLFT::mouseMoveEvent(QMouseEvent* e)
 		update();
 	}
 
-	old_x = p.x();
-	old_y = p.y();
+	old_x = e->position().x();
+	old_y = e->position().y();
 }
 
 void GLFT::paintGL()

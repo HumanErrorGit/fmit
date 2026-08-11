@@ -34,7 +34,6 @@
 #include <QAudioFormat>
 #include <QDir>
 #include <QDebug>
-#include <QMouseEvent>
 
 #ifdef __MINGW32__
     #define COMPILER "MinGW"
@@ -156,23 +155,6 @@ inline std::ostream& operator<<(std::ostream& stream, const QTime& t) {
     return stream;
 }
 
-// Portable mouse-event coordinates: QMouseEvent::position()/globalPosition()
-// return QPointF on Qt6; pos()/globalPos() are the Qt5 spelling (QPoint).
-inline QPoint eventPos(QMouseEvent* e) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    return e->position().toPoint();
-#else
-    return e->pos();
-#endif
-}
-inline QPoint eventGlobalPos(QMouseEvent* e) {
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
-    return e->globalPosition().toPoint();
-#else
-    return e->globalPos();
-#endif
-}
-
 inline QString formatToString(const QAudioFormat &format) {
 
     QString result;
@@ -184,7 +166,6 @@ inline QString formatToString(const QAudioFormat &format) {
         const QString formatEndian = QString("Assume LE");
 
         QString formatType;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
         switch (format.sampleFormat()) {
         case QAudioFormat::UInt8:
             formatType = "unsigned";
@@ -205,22 +186,6 @@ inline QString formatToString(const QAudioFormat &format) {
             formatType = "unknown";
             break;
         }
-#else
-        switch (format.sampleType()) {
-        case QAudioFormat::UnSignedInt:
-            formatType = "unsigned";
-            break;
-        case QAudioFormat::SignedInt:
-            formatType = "signed";
-            break;
-        case QAudioFormat::Float:
-            formatType = "float";
-            break;
-        default:
-            formatType = "unknown";
-            break;
-        }
-#endif
 
         QString formatChannels = QString("%1 channels").arg(format.channelCount());
         switch (format.channelCount()) {
@@ -237,11 +202,7 @@ inline QString formatToString(const QAudioFormat &format) {
 
         result = codec+" "+QString("%1Hz %2bit %3 %4 %5")
             .arg(format.sampleRate())
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
             .arg(format.bytesPerSample()*8)
-#else
-            .arg(format.sampleSize())
-#endif
             .arg(formatType)
             .arg(formatEndian)
             .arg(formatChannels);
