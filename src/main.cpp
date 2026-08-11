@@ -34,6 +34,7 @@ using namespace std;
 
 #include "qthelper.h"
 
+#include "WindowsConsole.h"
 #include "CustomInstrumentTunerForm.h"
 CustomInstrumentTunerForm* g_main_form = NULL;
 
@@ -56,6 +57,7 @@ QString FMITVersion(){
 
 int main(int argc, char** argv)
 {
+    initConsoleIfAttached();
     std::cout << "Free Music Instrument Tuner - Errorbuild (Version " << FMITVersion().toLatin1().constData() << ")" << std::endl;
 
     QString fmitprefix(STR(PREFIX));
@@ -88,11 +90,7 @@ int main(int argc, char** argv)
     // Load translation
     QTranslator qtTranslator;
     std::cout << "INFO: QLocale::system()=" << QLocale::system().name() << std::endl;
-#if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
     const QString qtTrPath = QLibraryInfo::path(QLibraryInfo::TranslationsPath);
-#else
-    const QString qtTrPath = QLibraryInfo::location(QLibraryInfo::TranslationsPath);
-#endif
     std::cout << "INFO: Qt translations path=" << qtTrPath.toLatin1().constData() << std::endl;
     QString trFile = "qt_" + QLocale::system().name();
     if (!qtTranslator.load(trFile, qtTrPath)) {

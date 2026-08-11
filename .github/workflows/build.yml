@@ -1,0 +1,243 @@
+name: Build & Package
+
+on:
+  push:
+    branches: [master]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [master]
+
+env:
+  GITVERSION: ''
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            platform: linux
+          - os: macos-latest
+            platform: macos
+          - os: windows-2025
+            platform: windows
+            arch: x64
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set version
+        shell: bash
+        run: |
+          VERSION=$(git describe --tags --always | sed 's/^v//')
+          echo "GITVERSION=$VERSION" >> $GITHUB_ENV
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            qt6-base-dev \
+            qt6-declarative-dev \
+            qt6-tools-dev \
+            qt6-multimedia-dev \
+            qt6-svg-dev \
+            libfftw3-dev \
+            libpulse-dev \
+            libasound2-dev \
+            lsb-release \
+            itstool \
+            gettext \
+            dpkg-dev
+
+      - name: Install macOS dependencies
+        if: matrix.platform == 'macos'
+        run: |
+          brew install fftw qt
+          if [ -d "/usr/local/opt/qt/bin" ]; then
+            echo "/usr/local/opt/qt/bin" >> $GITHUB_PATH
+          else
+            echo "/opt/homebrew/opt/qt/bin" >> $GITHUB_PATH
+          fi
+
+      - name: Setup Qt (Windows)
+        if: matrix.platform == 'windows'
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: '6.8.3'
+          host: 'windows'
+          target: 'desktop'
+          arch: 'win64_msvc2022_64'
+          modules: 'qtmultimedia'
+
+      - name: Install Windows dependencies
+        if: matrix.platform == 'windows'
+        run: |
+          choco install -y innosetup jom
+        shell: pwsh
+
+      - name: Cache vcpkg
+        if: matrix.platform == 'windows'
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\vcpkg
+            !C:\vcpkg\installed\*\debug
+          key: vcpkg-fftw3-x64-windows-v1
+          restore-keys: |
+            vcpkg-
+
+      - name: Setup FFTW3 (Windows)
+        if: matrix.platform == 'windows'
+        run: |
+          if (-not (Test-Path "C:\vcpkg\vcpkg.exe")) {
+            git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
+            C:\vcpkg\bootstrap-vcpkg.bat
+          }
+          $env:VCPKG_BUILD_TYPE = "release"
+          C:\vcpkg\vcpkg install fftw3:x64-windows
+          Write-Host "Installed FFTW3 files:"
+          Get-ChildItem "C:\vcpkg\installed\x64-windows\lib" -Filter "*fftw*" | ForEach-Object { Write-Host $_.Name }
+          Get-ChildItem "C:\vcpkg\installed\x64-windows\bin" -Filter "*fftw*" | ForEach-Object { Write-Host $_.Name }
+        shell: pwsh
+
+      - name: Print Qt version
+        shell: bash
+        run: |
+          echo "--- qmake ---"
+          qmake --version || echo "qmake not found"
+          echo "--- qmake6 ---"
+          qmake6 --version || echo "qmake6 not found"
+
+      - name: Configure (Linux)
+        if: matrix.platform == 'linux'
+        run: qmake6 "CONFIG+=acs_alsa" fmit.pro
+
+      - name: Configure (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          if [ -d "/usr/local/opt/fftw" ]; then
+            FFT_PATH="/usr/local/opt/fftw"
+          else
+            FFT_PATH="/opt/homebrew/opt/fftw"
+          fi
+          qmake "FFT_LIBDIR=$FFT_PATH" fmit.pro
+
+      - name: Setup MSVC environment
+        if: matrix.platform == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure (Windows)
+        if: matrix.platform == 'windows'
+        run: |
+          qmake "FFT_LIBDIR=C:/vcpkg/installed/x64-windows" fmit.pro
+        shell: cmd
+
+      - name: Build (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          make -j$(nproc)
+          make lrelease
+
+      - name: Build (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          make -j$(sysctl -n hw.ncpu)
+          make lrelease
+
+      - name: Build (Windows)
+        if: matrix.platform == 'windows'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          jom -f Makefile.Release
+          jom lrelease
+        shell: pwsh
+
+      - name: Package .deb (Linux)
+        if: matrix.platform == 'linux'
+        run: |
+          cd distrib
+          bash package_deb.sh ../fmit
+          cd ..
+          ARCH=$(dpkg --print-architecture)
+          mv distrib/fmit_*.deb "fmit_${GITVERSION}_${ARCH}.deb"
+          ls -l "fmit_${GITVERSION}_${ARCH}.deb"
+
+      - name: Package .dmg (macOS)
+        if: matrix.platform == 'macos'
+        run: |
+          macdeployqt fmit.app -dmg
+          mv fmit.dmg "fmit_${GITVERSION}.dmg"
+          ls -l "fmit_${GITVERSION}.dmg"
+
+      - name: Package .exe (Windows)
+        if: matrix.platform == 'windows'
+        run: |
+          pwsh -ExecutionPolicy Bypass -File distrib/package_windows.ps1 x64
+          Move-Item distrib/fmit_*_win*.exe .
+        shell: pwsh
+
+      - name: Upload Linux artifact
+        if: matrix.platform == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fmit-linux
+          path: fmit_${{ env.GITVERSION }}_*.deb
+
+      - name: Upload macOS artifact
+        if: matrix.platform == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fmit-macos
+          path: fmit_${{ env.GITVERSION }}.dmg
+
+      - name: Upload Windows artifact
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fmit-windows
+          path: fmit_*_win*.exe
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Extract release notes
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          sed -n "/version=\"$VERSION\"/,/<\/release>/p" distrib/fmit.appdata.xml \
+            | grep '<li>' \
+            | grep -v 'xml:lang' \
+            | sed 's/.*<li>\(.*\)<\/li>.*/- \1/' > release_notes.txt
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Version $VERSION" \
+            --notes-file release_notes.txt \
+            --draft \
+            artifacts/fmit-linux/*.deb \
+            artifacts/fmit-macos/*.dmg \
+            artifacts/fmit-windows/*.exe

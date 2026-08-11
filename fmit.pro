@@ -19,8 +19,7 @@
 
 # Audio Capture Systems: acs_qt, acs_alsa, acs_jack, acs_portaudio, acs_oss
 #                        (only acs_qt works on Windows)
-# CONFIG += acs_qt  # This needs solid refactoring for working with Qt6
-
+CONFIG += acs_qt
 
 # ------------------------------------------------------------------------------
 # (modify the following at your own risks !) -----------------------------------
@@ -109,10 +108,10 @@ win32 {
     }
     !isEmpty(FFT_LIBDIR){
         message(FFT_LIBDIR=$$FFT_LIBDIR)
-        INCLUDEPATH += $$FFT_LIBDIR
-        LIBS += -L$$FFT_LIBDIR
+        INCLUDEPATH += $$FFT_LIBDIR/include
+        LIBS += -L$$FFT_LIBDIR/lib
     }
-    msvc: LIBS += $$FFT_LIBDIR/libfftw3-3.lib
+    msvc: LIBS += $$FFT_LIBDIR/lib/fftw3.lib
     gcc: LIBS += -lfftw3-3
     # msvc: LIBS += $$FFT_LIBDIR/libfftw3f-3.lib
     # gcc: LIBS += -lfftw3f-3
@@ -134,12 +133,16 @@ win32 {
     msvc: LIBS += glu32.lib
     gcc: LIBS += -lopengl32
     gcc: LIBS += -lglu32
+    CONFIG -= console
+    CONFIG += windows
+    CONFIG -= app_bundle
 }
 
-QT += core gui opengl multimedia svg
+SOURCES += src/WindowsConsole.cpp
+HEADERS += src/WindowsConsole.h
+
+QT += core gui opengl openglwidgets multimedia svg
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
-# QOpenGLWidget lives in QtWidgets on Qt5, but moved to its own module on Qt6
-greaterThan(QT_MAJOR_VERSION, 5): QT += openglwidgets
 macx: QT += network
 
 INCLUDEPATH += libs
