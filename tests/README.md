@@ -28,13 +28,14 @@ the *current* behaviour and catch regressions. Tighten them as #1 is improved.
 
 The harness is a separate qmake project; it does **not** build with the app.
 
-### Windows (MinGW)
+### Windows (MSVC + vcpkg)
 
 ```powershell
-# from the tests/ directory, with Qt + MinGW on PATH
-qmake "FFT_LIBDIR=F:\path\to\fftw-3.3.5-dll64" dsp_test.pro
-mingw32-make -f Makefile.Release
-# run (Qt5Core, the MinGW runtime and libfftw3-3.dll must be reachable)
+# from a Developer PowerShell / after vcvars64.bat, with Qt's bin on PATH
+qmake "FFT_LIBDIR=F:/vcpkg/installed/x64-windows" dsp_test.pro
+jom -f Makefile.Release
+# fftw3.dll isn't on PATH by default -- copy it next to the exe before running
+Copy-Item F:\vcpkg\installed\x64-windows\bin\fftw3.dll release\ -Force
 release\dsp_test.exe
 ```
 
@@ -47,12 +48,13 @@ make
 ./dsp_test
 ```
 
-`FFT_LIBDIR` mirrors `fmit.pro`: on Windows it points at the FFTW DLL folder;
-on Linux the system `libfftw3` is used by default.
+`FFT_LIBDIR` mirrors `fmit.pro`: on Windows it points at the vcpkg install
+prefix (`include/`, `lib/fftw3.lib`, `bin/fftw3.dll`); on Linux the system
+`libfftw3` is used by default.
 
 ## Expected output
 
-A list of `[PASS]`/`[FAIL]` lines ending in `13/13 checks passed, 0 failed`
+A list of `[PASS]`/`[FAIL]` lines ending in `N/N checks passed, 0 failed`
 and exit code `0`. Note that on synthetic input `CombedFT` is essentially
 rock-stable (pure-sine f0 stddev ≈ 0.01 cents), which is why the #1 wobble is
 suspected to live downstream (quantizer / display) or in noisier real input.
