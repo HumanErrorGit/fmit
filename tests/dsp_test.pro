@@ -3,7 +3,9 @@
 #
 # Usage (Windows / MSVC):
 #   qmake "FFT_LIBDIR=F:/vcpkg/installed/x64-windows" dsp_test.pro
-#   jom -f Makefile.Release
+#   nmake -f Makefile.Release
+#   (jom does NOT work here -- fails with a false "dependent does not exist"
+#    error on Qt 6.8.3 qmake-generated Makefiles; nmake is what was verified)
 # Usage (Linux):
 #   qmake6 dsp_test.pro && make
 
