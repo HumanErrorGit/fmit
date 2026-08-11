@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **FMIT (Free Music Instrument Tuner)** — a cross-platform Qt desktop application for real-time musical instrument tuning. It captures audio, detects the fundamental frequency (f0) using DSP algorithms, and visualizes the result via multiple OpenGL views.
 
-Current version: 1.3.3. Source: https://github.com/gillesdegottex/fmit
+Current version: 1.4.6 (per `README.txt` and `git describe --tags`, which is also how `fmit.pro` derives `FMITVERSION`; verified after the upstream v1.4.6 merge, commit `eaf6b6f`). Source: https://github.com/gillesdegottex/fmit
 
 ## Build System
 
